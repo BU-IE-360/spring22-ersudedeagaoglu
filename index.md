@@ -6,4 +6,4 @@
 
 [link](https://bu-ie-360.github.io/spring22-ilaydacelenkk/files/IE360_PS1_1-3-22.html)
 
-[here](/file/ie360HW1.html)
+[here](file/ie360HW1.html)
