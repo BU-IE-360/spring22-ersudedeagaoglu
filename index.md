@@ -4,6 +4,8 @@
 ### HW2
 ### HW3
 
-[link](https://bu-ie-360.github.io/spring22-ilaydacelenkk/files/IE360_PS1_1-3-22.html)
-
+### Html file for HW 1 is
 [here](file/ie360HW1.html)
+
+### R script for HW 1 is
+[here](file/ie360HW1_güncel.R)
