@@ -5,4 +5,4 @@
 ### HW3
 
 [link](https://moodle.boun.edu.tr/login/login.php)
-[link](/files/file)
+[link](/file/ie360HW1.html)
