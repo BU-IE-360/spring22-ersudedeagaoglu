@@ -1,8 +1,6 @@
 ## Welcome to My Page
 
-### HW1
-### HW2
-### HW3
+### HOMEWORK 1
 
 Html file for HW 1 is [here](file/ie360HW1.html)
 
