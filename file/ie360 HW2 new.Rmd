@@ -1,0 +1,233 @@
+---
+title: "Ie360 Spring22 HW2"
+author: "Ersu DEDEAĞAOĞLU / 2018402081"
+date: "5/11/2022"
+output: html_document
+
+---
+<style type="text/css">
+  body{
+  font-family: Times New Roman;
+  font-size: 12pt;
+}
+</style>
+
+# Introduction
+
+This assignment mainly aims to predict the unleaded gasoline sale in 2007 for each quarter,
+using the past values and some potentially related input variables. These variables are summarized as follows: <br>
+
+UGS: Unleaded gasoline sale in a given quarter(output variable), <br>
+RNUV: An index indicating the rate of new unleaded gasoline using vehicles being added to the traffic in a quarter, <br>
+PU: Average price (adjusted with an index) of a liter of unleaded gasoline in a quarter, <br>
+PG: Average price (adjusted with an index) of a liter of diesel gasoline in a quarter, <br>
+NUGV: Number of unleaded gasoline using vehicles in the traffic, <br>
+NDGV: Number of diesel gasoline using vehicles in the traffic (per 1000 people), <br>
+GNPA: Agriculture component of Gross National Product (adjusted with an index), <br>
+GNPC: Commerce component of Gross National Product (adjusted with an index), <br>
+GNP: Grand total for GNP (agriculture, commerce and other components total).
+
+# Data Manipulation 
+
+## Libraries 
+
+```{r warning=FALSE, message=FALSE}
+library(readxl)
+library(skimr)
+library(janitor)
+library(readr)
+library(tidyverse)
+library(fBasics)
+library(dplyr)
+library(data.table)
+library(writexl)
+library(scales)
+library(plyr)
+library(zoo)
+library(lubridate)
+library(ggplot2)
+library(forecast)
+library(corrplot)
+library(ggcorrplot)
+library(xts)
+```
+
+## Import and arrange the data
+
+```{r warning=FALSE, message=FALSE}
+setwd("C:/Users/Erkut/Desktop/ie 360")
+
+data <- read.csv("IE360_Spring22_HW2_data_.csv")
+data <- data[,c(1:11)]
+data
+# data <- data[data$Unleaded.Gasoline.Sale..UGS.!="",]
+data$Quarter <- as.yearqtr(data$Quarter, format = "%Y_Q%q")
+str(data)
+
+### create ugs data
+data_ugs <- data[,2]
+data_ugs <- data_ugs[!is.na(data_ugs)]
+```
+
+## Insight
+
+```{r warning=FALSE, message=FALSE}
+datats <- ts(data_ugs,freq=4,start=c(2000,1))
+str(datats)
+datats
+ts.plot(datats,xlab = "Year", ylab = "Sale",main=" Unleaded Gasoline Sale (in 1000 m3)")
+```
+
+As it can be seen, mean is non-stationary when the variance seems stationary. It also useful to check the trend of the data.
+
+```{r warning=FALSE, message=FALSE}
+dec_data<-decompose(datats, type="additive")
+plot(dec_data) 
+```
+
+This decomposition function helps us to visualize the components of time series data. As we can clearly see, there is a decreasing trend in UGS, which states that the mean is non-stationary.
+
+```{r warning=FALSE, message=FALSE}
+acf(data_ugs, lag = 12)
+```
+
+There seems a high autocorrelation at lag 1 and lag 4. Lag 1 comes from the idea that when we think of two consequent
+quarters, the letter affects the next one. Lag 4 is high since the same quarter at the next year shows a similar behavior with the one in this year.
+
+```{r warning=FALSE, message=FALSE}
+pairs(data[,c(2:11)])
+```
+
+We should consider the relation between UGS and other variables. This pairs functions help us achieve this.
+
+## Components and Lags
+
+```{r warning=FALSE, message=FALSE}
+
+### add trend and seasonality 
+trend <- 1:32
+data$trend <- trend
+data$quarter <- rep(1:4,8)
+data$lag1 <- NA
+data$lag4 <- NA
+
+data$quarter <- as.factor(data$quarter)
+
+for(i in 1:28){
+  data$lag1[i+1] = data$Unleaded.Gasoline.Sale..UGS.[i]
+}
+
+for(i in 1:28){
+  data$lag4[i+4] = data$Unleaded.Gasoline.Sale..UGS.[i]
+}
+```
+
+# Model Building
+
+```{r warning=FALSE, message=FALSE}
+model <- lm(Unleaded.Gasoline.Sale..UGS. ~. - Quarter, data = data[1:28,])
+summary(model)
+```
+
+Backward selection is used for variable selection. In this sense, all variables are added to the model as a first step.
+The first purpose is to select which variables to use, so at these first steps, trend and seasonality components are not removed. It can be observed that the significance of "PU" is lower among these variables. But, checking the meanings of these variables, price of the unleaded gasoline should significantly affect its sales. This problem probably occur from the fact that the number of observations are small, which results in some misleading outputs, and some variables are so correlated that the model gives them low significance to handle double counting errors. In this sense, it is highly useful to check correlation results among variables.
+
+```{r warning=FALSE, message=FALSE}
+temp_data <- data[!is.na(data$Unleaded.Gasoline.Sale..UGS. & data$lag1 & data$lag4),]
+corr = cor(temp_data[,unlist(lapply(temp_data, is.numeric))])
+ggcorrplot(corr,
+           hc.order = TRUE,
+           type='lower',
+           lab=TRUE)
+```
+
+The variable pairs with high correlations are important because a good model includes less correlated variables. Therefore, as a first improvement, PG is removed considering that its significance value is not that much, and it has a large correlation with PU. 
+
+```{r warning=FALSE, message=FALSE}
+model2 <- lm(Unleaded.Gasoline.Sale..UGS. ~. - Quarter - Price.of.Diesel.Gasoline..PG., data = data[1:28,])
+summary(model2)
+```
+
+Adjusted R squared is slightly decreased and SSE is slightly increased, but I think it can be overlooked because it prepares the ground for the model to develop better in the following steps. The next most insignificant variable is GNP.Agriculture, so it is removed. 
+
+```{r warning=FALSE, message=FALSE}
+model3 <- lm(Unleaded.Gasoline.Sale..UGS. ~. - Quarter - Price.of.Diesel.Gasoline..PG.
+             - GNP.Agriculture, data = data[1:28,])
+summary(model3)
+```
+
+The next most insignificant variable is GNP.Total, so it is removed. 
+
+```{r warning=FALSE, message=FALSE}
+model4 <- lm(Unleaded.Gasoline.Sale..UGS. ~. - Quarter - Price.of.Diesel.Gasoline..PG.
+             -GNP.Agriculture - GNP.Total  , data = data[1:28,])
+summary(model4)
+```
+
+The next most insignificant variable is GNP.Commerce, so it is removed.
+
+```{r warning=FALSE, message=FALSE}
+model5 <- lm(Unleaded.Gasoline.Sale..UGS. ~. - Quarter - Price.of.Diesel.Gasoline..PG.
+             -GNP.Agriculture - GNP.Total - GNP.Commerce , data = data[1:28,])
+summary(model5)
+```
+
+The next insignificant variable is RNUV. At the first look at its meaning, it seems like a variable that can explain UGS, so it should be added to the model. But, considering that it shows its results at the NUGV value of the next year, it can be removed as long as NUGV stays in the model. 
+
+```{r warning=FALSE, message=FALSE}
+model6 <- lm(Unleaded.Gasoline.Sale..UGS. ~. - Quarter - Price.of.Diesel.Gasoline..PG.
+             -GNP.Agriculture - GNP.Total - GNP.Commerce - RNUV, data = data[1:28,])
+summary(model6)
+```
+
+The next most insignificant variable is GNP.Commerce, so it is removed.
+
+```{r warning=FALSE, message=FALSE}
+model7 <- lm(Unleaded.Gasoline.Sale..UGS. ~. - Quarter - Price.of.Diesel.Gasoline..PG.
+             -GNP.Agriculture - GNP.Total - GNP.Commerce - RNUV - X..LPG.Vehicles..NLPG., data = data[1:28,])
+summary(model7)
+```
+
+Now, we can consider trend, seasonality and lag terms. Taking account that the p value of lag4 is high, and also it is not so good to use two lag values at the same time, it is removed from the model.
+
+```{r warning=FALSE, message=FALSE}
+
+best_model <- lm(Unleaded.Gasoline.Sale..UGS. ~ Price.of.Unleaded.Gasoline..PU.
+                 + X..Unleaded.Gasoline.Vehicles..NUGV. + X..of.Diesel.Gasoline.Vehicles..NDGV.
+                 + quarter + trend + lag1, data = data[1:28,])
+summary(best_model)
+```
+
+Now we can check if the last model is good enough. All variables have a good significance level and we have a good adjusted R squared value.  
+
+```{r warning=FALSE, message=FALSE}
+plot(best_model)
+```
+
+# Evaluation of the Best
+
+```{r warning=FALSE, message=FALSE}
+checkresiduals(best_model)
+```
+
+Even the last model seems problematic at some perspectives. To be more specific, the normalization assumption of residuals is violated at some degree. We can see that from both Q-Q plot and histogram. Also, it can be improved in terms of the variance constancy of the residuals. However, taking account that the violations are not so large and we have a low amount of data, these violations can be ignored. The summary of the last model supports the idea that it is sufficiently good to use. When it comes to autocorrelation of residuals, there is a out of bound value at lag 4. However, lag4 was added to the model and seen that the SSE values and Adj R^2 value gets worse interestingly, it is not decided to be added to the model. Actually, it probably comes from that we already added quarter seasonality to data, which already shows a similar behavior as in lag4.
+
+# Predictions
+
+```{r warning=FALSE, message=FALSE}
+pred = c()
+for(i in 1:4){
+  pred[i] = predict(best_model,newdata=data[i+28,])
+  if(i+28 < 32){
+    data$lag1[i+29] = pred[i]
+  }
+}
+pred
+data$lag1
+```
+
+# Conclusion
+
+To conclude, it is tried to find a good model to predict upcoming values of UGS. To achieve a sufficiently good model, some components (trend, seasonality and lag values) and other input variables that have a possibility to explain our output variable UGS are examined by adding to the model. As a variable selection approach, backward selection process is selected. While removing variables, roughly these considerations are used: improvement in adj R^2, reduction in SSE, meaning of the input variables, correlation between different input variables, correlation between UGS and input variables etc. At the end of the improvement iterations, a sufficiently good model is achieved and it is specified that in what aspects it is strong and how it can be better.   
+
+
