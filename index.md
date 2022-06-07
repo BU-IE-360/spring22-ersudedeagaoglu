@@ -16,4 +16,4 @@ R script for HW 2 is [here](file/ie360HW2.R)
 
 Html file for term project is [here](file/Group13Project.html)
 
-R script for HW 2 is [here](file/Group13Project.r)
+R script for term project is [here](file/Group13Project.r)
